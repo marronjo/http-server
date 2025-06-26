@@ -9,7 +9,7 @@ import (
 )
 
 type Request struct {
-	status      int // 0 = initialised, 1 = done
+	status      requestStatus // 0 = initialised, 1 = done
 	RequestLine RequestLine
 }
 
@@ -19,17 +19,25 @@ type RequestLine struct {
 	Method        string
 }
 
+type requestStatus int
+
+const (
+	requestStatusInit requestStatus = iota
+	requestStatusDone
+)
+
 const crlf = "\r\n"
 const bufferSize = 8
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	request := new(Request)
-	request.status = 0 //initialised
+	request := &Request{
+		status: requestStatusInit,
+	}
 
 	buffer := make([]byte, bufferSize)
 	readToIndex := 0
 
-	for request.status != 1 {
+	for request.status != requestStatusDone {
 
 		if readToIndex >= len(buffer) {
 			tmp := make([]byte, len(buffer)*2)
@@ -41,7 +49,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		readToIndex += n
 
 		if err == io.EOF { //deal with EOF
-			request.status = 1
+			request.status = requestStatusDone
 		}
 		if err != nil && err != io.EOF {
 			return nil, err
@@ -100,7 +108,7 @@ func parseRequestLine(data []byte) (*RequestLine, int, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	if r.status == 0 {
+	if r.status == requestStatusInit {
 		requestLine, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
@@ -109,9 +117,9 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, nil
 		}
 		r.RequestLine = *requestLine
-		r.status = 1
+		r.status = requestStatusDone
 		return n, nil
-	} else if r.status == 1 {
+	} else if r.status == requestStatusDone {
 		return 0, fmt.Errorf("error parsing done request")
 	}
 	return 0, fmt.Errorf("error parsing unknown state")
