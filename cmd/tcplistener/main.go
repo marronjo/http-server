@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-	"strings"
+	"server/internal/request"
 )
 
 func main() {
@@ -20,45 +20,16 @@ func main() {
 			fmt.Println(err)
 		}
 
-		fmt.Println("Connection accepted")
-
-		c := getLinesChannel(conn)
-
-		for v := range c {
-			fmt.Printf("%s\n", v)
+		request, e := request.RequestFromReader(conn)
+		if e != nil {
+			panic(e)
 		}
 
-		fmt.Println("Connection closed")
+		requestLine := request.RequestLine
+
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %s\n", requestLine.Method)
+		fmt.Printf("- Target: %s\n", requestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", requestLine.HttpVersion)
 	}
-}
-
-func getLinesChannel(conn net.Conn) <-chan string {
-	c := make(chan string)
-
-	b := make([]byte, 8)
-	line := ""
-
-	go func(conn net.Conn) {
-		defer close(c)
-		for {
-			n, err := conn.Read(b)
-			if err != nil {
-				line += string(b[:n])
-				c <- line
-				break
-			}
-
-			parts := strings.Split(string(b[:n]), "\n")
-			if len(parts) == 1 {
-				line += parts[0]
-			}
-			if len(parts) > 1 {
-				line += parts[0]
-				c <- line
-				line = parts[1]
-			}
-		}
-	}(conn)
-
-	return c
 }
